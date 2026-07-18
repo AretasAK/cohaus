@@ -9,6 +9,7 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { EmptyState } from '../../components/EmptyState';
 import { BottomSheet } from '../../components/BottomSheet';
+import { GroupIcon } from '../../components/GroupIcon';
 import { useTheme } from '../../theme/ThemeProvider';
 import { useGroupStore } from '../../store/groupStore';
 import { useNotificationStore } from '../../store/notificationStore';
@@ -130,18 +131,7 @@ export function GroupsScreen({ navigation, selectedGroupId, onSelectGroup }: any
             >
               <Card style={selected ? { backgroundColor: theme.primarySoft, borderColor: theme.primary } : undefined}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  <View
-                    style={{
-                      width: 46,
-                      height: 46,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: theme.primary,
-                    }}
-                  >
-                    <Ionicons name="home" size={22} color={theme.primaryText} />
-                  </View>
+                  <GroupIcon coverUrl={item.cover_url} icon={item.icon} size={46} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 17, fontWeight: '700', color: theme.text }}>{item.name}</Text>
                     <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 3 }}>

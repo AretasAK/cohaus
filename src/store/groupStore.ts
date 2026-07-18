@@ -18,6 +18,7 @@ export interface Group {
   name: string;
   description: string | null;
   cover_url: string | null;
+  icon: string | null;
   enabled_modules: Record<string, boolean>;
   created_by: string | null;
   created_at: string;
@@ -37,6 +38,7 @@ interface GroupState {
   leaveGroup: (groupId: string) => Promise<void>;
   updateGroupCover: (groupId: string, localUri: string) => Promise<string | null>;
   updateGroupDescription: (groupId: string, description: string) => Promise<string | null>;
+  updateGroupIcon: (groupId: string, icon: string) => Promise<string | null>;
 }
 
 const ACTIVE_GROUP_KEY = 'cohaus.active_group_id';
@@ -183,6 +185,13 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       .from('groups')
       .update({ description: description.trim() || null })
       .eq('id', groupId);
+    if (error) return i18n.t('errors.updateNameFailed');
+    await get().fetchGroups();
+    return null;
+  },
+
+  updateGroupIcon: async (groupId: string, icon: string) => {
+    const { error } = await supabase.from('groups').update({ icon, cover_url: null }).eq('id', groupId);
     if (error) return i18n.t('errors.updateNameFailed');
     await get().fetchGroups();
     return null;

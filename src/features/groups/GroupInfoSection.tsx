@@ -8,19 +8,56 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Avatar } from '../../components/Avatar';
 import { BottomSheet } from '../../components/BottomSheet';
+import { GroupIcon } from '../../components/GroupIcon';
 import { useTheme } from '../../theme/ThemeProvider';
 import { useGroupStore } from '../../store/groupStore';
 import { useAuthStore } from '../../store/authStore';
 
+const ICON_OPTIONS: (keyof typeof Ionicons.glyphMap)[] = [
+  'home',
+  'people',
+  'restaurant',
+  'bed',
+  'cafe',
+  'gift',
+  'star',
+  'heart',
+  'paw',
+  'bicycle',
+  'car',
+  'airplane',
+  'book',
+  'musical-notes',
+  'game-controller',
+  'football',
+  'leaf',
+  'sunny',
+  'moon',
+  'business',
+  'school',
+  'beer',
+  'pizza',
+];
+
 export function GroupInfoSection({ groupId, navigation }: { groupId: string; navigation: any }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
-  const { groups, members, fetchMembers, createInvite, leaveGroup, updateGroupCover, updateGroupDescription } =
-    useGroupStore();
+  const {
+    groups,
+    members,
+    fetchMembers,
+    createInvite,
+    leaveGroup,
+    updateGroupCover,
+    updateGroupDescription,
+    updateGroupIcon,
+  } = useGroupStore();
   const currentUserId = useAuthStore((s) => s.session?.user.id);
   const [invLoading, setInvLoading] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
   const [descDraft, setDescDraft] = useState('');
   const [savingDesc, setSavingDesc] = useState(false);
@@ -33,7 +70,8 @@ export function GroupInfoSection({ groupId, navigation }: { groupId: string; nav
     fetchMembers(groupId);
   }, [groupId]);
 
-  const handleChangeCover = async () => {
+  const handlePickPhoto = async () => {
+    setCoverPickerOpen(false);
     setCoverError(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -50,6 +88,13 @@ export function GroupInfoSection({ groupId, navigation }: { groupId: string; nav
     setUploadingCover(true);
     const err = await updateGroupCover(groupId, result.assets[0].uri);
     setUploadingCover(false);
+    if (err) setCoverError(err);
+  };
+
+  const handlePickIcon = async (icon: string) => {
+    setCoverError(null);
+    setIconPickerOpen(false);
+    const err = await updateGroupIcon(groupId, icon);
     if (err) setCoverError(err);
   };
 
@@ -96,7 +141,7 @@ export function GroupInfoSection({ groupId, navigation }: { groupId: string; nav
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-      <Pressable onPress={handleChangeCover} disabled={uploadingCover} style={{ marginBottom: 12 }}>
+      <Pressable onPress={() => setCoverPickerOpen(true)} disabled={uploadingCover} style={{ marginBottom: 12 }}>
         <View
           style={{
             height: 140,
@@ -109,6 +154,8 @@ export function GroupInfoSection({ groupId, navigation }: { groupId: string; nav
         >
           {group?.cover_url ? (
             <Image source={{ uri: group.cover_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          ) : group?.icon ? (
+            <GroupIcon coverUrl={null} icon={group.icon} size={72} />
           ) : (
             <Ionicons name="image-outline" size={28} color={theme.textMuted} />
           )}
@@ -176,6 +223,53 @@ export function GroupInfoSection({ groupId, navigation }: { groupId: string; nav
       <View style={{ marginTop: 32 }}>
         <Button label={t('groupInfo.leaveGroup')} variant="danger" onPress={handleLeave} />
       </View>
+
+      <BottomSheet visible={coverPickerOpen} onClose={() => setCoverPickerOpen(false)}>
+        <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 16 }}>
+          {t('groupInfo.coverPickerTitle')}
+        </Text>
+        <Pressable
+          onPress={handlePickPhoto}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: theme.inputBg, borderRadius: 14, padding: 16, marginBottom: 10 }}
+        >
+          <Ionicons name="image-outline" size={20} color={theme.text} />
+          <Text style={{ color: theme.text, fontWeight: '600', fontSize: 15 }}>{t('groupInfo.pickPhoto')}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            setCoverPickerOpen(false);
+            setIconPickerOpen(true);
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: theme.inputBg, borderRadius: 14, padding: 16 }}
+        >
+          <Ionicons name="shapes-outline" size={20} color={theme.text} />
+          <Text style={{ color: theme.text, fontWeight: '600', fontSize: 15 }}>{t('groupInfo.pickIcon')}</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <BottomSheet visible={iconPickerOpen} onClose={() => setIconPickerOpen(false)}>
+        <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 16 }}>
+          {t('groupInfo.pickIcon')}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          {ICON_OPTIONS.map((iconName) => (
+            <Pressable
+              key={iconName}
+              onPress={() => handlePickIcon(iconName)}
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: group?.icon === iconName ? theme.primary : theme.inputBg,
+              }}
+            >
+              <Ionicons name={iconName} size={22} color={group?.icon === iconName ? theme.primaryText : theme.text} />
+            </Pressable>
+          ))}
+        </View>
+      </BottomSheet>
 
       <BottomSheet visible={descOpen} onClose={() => setDescOpen(false)}>
         <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text, marginBottom: 16 }}>

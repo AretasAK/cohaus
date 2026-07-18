@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { findProductMatch } from '../lib/products';
+import { recordPurchase } from '../lib/purchaseCycles';
 import i18n from '../i18n';
 
 export interface PantryItem {
@@ -87,6 +88,7 @@ export const usePantryStore = create<PantryState>((set, get) => ({
       await supabase.from('pantry_items').insert({ group_id: groupId, product_id: productId, qty, unit });
     }
 
+    recordPurchase(groupId, productId).catch(() => {});
     await get().fetchPantry(groupId);
   },
 

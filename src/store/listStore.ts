@@ -135,8 +135,10 @@ export const useListStore = create<ListState>((set, get) => ({
     const userId = userData.user?.id;
 
     const match = await findProductMatch(trimmed, i18n.language);
+    let productId: string | null;
 
     if (match) {
+      productId = match.id;
       await supabase.from('list_items').insert({
         list_id: listId,
         product_id: match.id,
@@ -151,15 +153,30 @@ export const useListStore = create<ListState>((set, get) => ({
         .insert({ canonical_name: trimmed })
         .select('id')
         .single();
+      productId = newProduct?.id ?? null;
 
       await supabase.from('list_items').insert({
         list_id: listId,
-        product_id: newProduct?.id ?? null,
+        product_id: productId,
         custom_name: trimmed,
         qty,
         created_by: userId,
       });
     }
+
+    if (productId) {
+      supabase
+        .from('lists')
+        .select('name')
+        .eq('id', listId)
+        .single()
+        .then(({ data: list }) => {
+          if (list?.name) {
+            supabase.from('products').update({ preferred_list_name: list.name }).eq('id', productId).then(() => {});
+          }
+        });
+    }
+
     await get().fetchItems(listId);
   },
 

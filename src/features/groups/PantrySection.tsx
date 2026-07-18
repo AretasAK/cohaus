@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,8 @@ import { SwipeableRow } from '../../components/SwipeableRow';
 import { ProductSuggestions } from '../../components/ProductSuggestions';
 import { useTheme } from '../../theme/ThemeProvider';
 import { PantryItem, usePantryStore } from '../../store/pantryStore';
+import { useListStore } from '../../store/listStore';
+import { fetchPurchasePredictions, getPreferredListName, PurchasePrediction } from '../../lib/purchaseCycles';
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -20,21 +22,55 @@ function daysUntil(dateStr: string | null): number | null {
 }
 
 export function PantrySection({ groupId, navigation }: { groupId: string; navigation: any }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
   const { itemsByGroup, fetchPantry, addOrIncrement, updateQty, removeItem } = usePantryStore();
+  const listsByGroup = useListStore((s) => s.listsByGroup);
+  const fetchLists = useListStore((s) => s.fetchLists);
+  const addItem = useListStore((s) => s.addItem);
 
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState('');
   const [qty, setQty] = useState('1');
   const [unit, setUnit] = useState('ud');
   const [saving, setSaving] = useState(false);
+  const [predictions, setPredictions] = useState<PurchasePrediction[]>([]);
+  const [pendingPrediction, setPendingPrediction] = useState<PurchasePrediction | null>(null);
+  const [listPickerOpen, setListPickerOpen] = useState(false);
 
   const items = itemsByGroup[groupId] ?? [];
+  const openLists = (listsByGroup[groupId] ?? []).filter((l) => l.status === 'open');
 
   useEffect(() => {
     fetchPantry(groupId);
-  }, [groupId]);
+    fetchLists(groupId);
+    fetchPurchasePredictions(groupId, i18n.language).then(setPredictions);
+  }, [groupId, i18n.language]);
+
+  const addPredictionToList = async (listId: string, prediction: PurchasePrediction) => {
+    await addItem(listId, prediction.name);
+    setPredictions((prev) => prev.filter((p) => p.product_id !== prediction.product_id));
+    setListPickerOpen(false);
+    setPendingPrediction(null);
+  };
+
+  const handleAddPrediction = async (prediction: PurchasePrediction) => {
+    if (openLists.length === 0) {
+      Alert.alert(t('recipes.errorNoOpenLists'));
+      return;
+    }
+    const preferredName = await getPreferredListName(prediction.product_id);
+    const target = preferredName ? openLists.find((l) => l.name === preferredName) : null;
+
+    if (target) {
+      await addPredictionToList(target.id, prediction);
+    } else if (openLists.length === 1) {
+      await addPredictionToList(openLists[0].id, prediction);
+    } else {
+      setPendingPrediction(prediction);
+      setListPickerOpen(true);
+    }
+  };
 
   const handleAdd = async () => {
     const parsedQty = parseFloat(qty.replace(',', '.')) || 1;
@@ -99,6 +135,36 @@ export function PantrySection({ groupId, navigation }: { groupId: string; naviga
         </Pressable>
       </View>
 
+      {predictions.length > 0 ? (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textMuted, marginBottom: 8, letterSpacing: 0.5 }}>
+            {t('pantry.predictionsHeader')}
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
+            {predictions.map((p) => (
+              <Pressable
+                key={p.product_id}
+                onPress={() => handleAddPrediction(p)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 9,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  backgroundColor: theme.card,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+              >
+                <Ionicons name="add-circle-outline" size={15} color={theme.primary} />
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{p.name}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
         {items.length === 0 ? (
           <EmptyState
@@ -132,6 +198,27 @@ export function PantrySection({ groupId, navigation }: { groupId: string; naviga
           <Input placeholder={t('pantry.unitPlaceholder')} value={unit} onChangeText={setUnit} containerStyle={{ flex: 1 }} />
         </View>
         <Button label={t('pantry.add')} onPress={handleAdd} loading={saving} />
+      </BottomSheet>
+
+      <BottomSheet visible={listPickerOpen} onClose={() => setListPickerOpen(false)}>
+        <Text style={{ fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 16 }}>
+          {t('pantry.selectListTitle')}
+        </Text>
+        {openLists.map((l) => (
+          <Pressable
+            key={l.id}
+            onPress={() => pendingPrediction && addPredictionToList(l.id, pendingPrediction)}
+            style={{
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: 14,
+              backgroundColor: theme.inputBg,
+              marginBottom: 8,
+            }}
+          >
+            <Text style={{ color: theme.text, fontWeight: '600', fontSize: 15 }}>{l.name}</Text>
+          </Pressable>
+        ))}
       </BottomSheet>
     </View>
   );
